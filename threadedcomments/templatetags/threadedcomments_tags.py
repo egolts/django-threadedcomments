@@ -14,17 +14,18 @@ class CommentListNode(BaseThreadedCommentNode):
     """
     Insert a list of comments into the context.
     """
-
-    def __init__(self, flat=False, root_only=False, **kwargs):
+    def __init__(self, flat=False, root_only=False, reverse=False, **kwargs):
         self.flat = flat
         self.root_only = root_only
+        self.reverse = reverse
         super(CommentListNode, self).__init__(**kwargs)
 
     def handle_token(cls, parser, token):
         tokens = token.contents.split()
 
         extra_kw = {}
-        if tokens[-1] in ('flat', 'root_only'):
+        if tokens[-1] in ('flat', 'root_only', 'reverse'):
+            
             extra_kw[str(tokens.pop())] = True
 
         if len(tokens) == 5:
@@ -48,11 +49,24 @@ class CommentListNode(BaseThreadedCommentNode):
 
     handle_token = classmethod(handle_token)
 
-    def get_context_value_from_queryset(self, context, qs):
-        if self.flat:
-            qs = qs.order_by('-submit_date')
+    def get_context_value_from_queryset(self, context, qs):	
+	if self.flat:
+            qs = qs.exclude(is_removed__exact=True).order_by('-submit_date',)[0:3]
         elif self.root_only:
             qs = qs.exclude(parent__isnull=False).order_by('-submit_date')
+        elif self.reverse:
+            children = qs.exclude(parent__isnull=True)
+            parents = qs.exclude(parent__isnull=False).order_by('-submit_date')
+            
+            new_qs = []
+            
+            for p in parents:
+                new_qs.append(p)
+                for c in children:
+                    if c.parent_id == p.comment_ptr_id:    
+                        new_qs.append(c)
+            qs = new_qs
+        
         return qs
 
 
@@ -70,6 +84,7 @@ class CommentFormNode(BaseThreadedCommentNode):
             return super(CommentFormNode, cls).handle_token(parser, token)
         # {% get_comment_form for [object] as [varname] with [parent_id] %}
         if len(tokens) == 7:
+            
             if tokens[-2] != u'with':
                 raise template.TemplateSyntaxError("%r tag must have a 'with' "
                     "as the last but one argument." % (tokens[0],))
@@ -174,7 +189,7 @@ class RenderCommentFormNode(CommentFormNode):
             return ''
 
 
-def get_comment_list(parser, token):
+def get_threadedcomment_list(parser, token):
     """
     Gets the list of comments for the given params and populates the template
     context with a variable containing that value, whose name is defined by the
@@ -198,7 +213,7 @@ def get_comment_list(parser, token):
     """
     return CommentListNode.handle_token(parser, token)
 
-def get_comment_form(parser, token):
+def get_threadedcomment_form(parser, token):
     """
     Get a (new) form object to post a new comment.
 
@@ -211,7 +226,7 @@ def get_comment_form(parser, token):
     """
     return CommentFormNode.handle_token(parser, token)
 
-def render_comment_form(parser, token):
+def render_threadedcomment_form(parser, token):
     """
     Render the comment form (as returned by ``{% render_comment_form %}``) 
     through the ``comments/form.html`` template.
@@ -232,6 +247,6 @@ def annotate_tree(comments):
 
 register.filter(annotate_tree)
 register.filter(fill_tree)
-register.tag(get_comment_list)
-register.tag(get_comment_form)
-register.tag(render_comment_form)
+register.tag(get_threadedcomment_list)
+register.tag(get_threadedcomment_form)
+register.tag(render_threadedcomment_form)

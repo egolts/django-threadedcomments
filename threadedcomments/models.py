@@ -15,7 +15,8 @@ class ThreadedComment(Comment):
         verbose_name=_('Last child'))
     tree_path = models.TextField(_('Tree path'), editable=False,
         db_index=True)
-
+    email_alert = models.BooleanField(blank=True)
+    
     objects = CommentManager()
 
     def _get_depth(self):

@@ -2,16 +2,17 @@ from django import forms
 from django.contrib.comments.forms import CommentForm
 from django.conf import settings
 from django.utils.hashcompat import sha_constructor
-from django.utils.translation import ugettext_lazy as _
 
 from threadedcomments.models import ThreadedComment
 
 class ThreadedCommentForm(CommentForm):
     parent = forms.IntegerField(required=False, widget=forms.HiddenInput)
-
+    email_alert = forms.BooleanField(required=False, label="please send me an email alert when this comment recieves a reply")
+    body = forms.CharField(required=False, widget=forms.HiddenInput)
+    
     def __init__(self, target_object, parent=None, data=None, initial=None):
         self.base_fields.insert(
-                self.base_fields.keyOrder.index('comment'), _('title'),
+                self.base_fields.keyOrder.index('comment'), 'title',
                 forms.CharField(
                     required=False,
                     max_length=getattr(settings, 'COMMENTS_TITLE_MAX_LENGTH', 255)
@@ -31,5 +32,7 @@ class ThreadedCommentForm(CommentForm):
         d = super(ThreadedCommentForm, self).get_comment_create_data()
         d['parent_id'] = self.cleaned_data['parent']
         d['title'] = self.cleaned_data['title']
+        d['email_alert'] = self.cleaned_data['email_alert']
+        
         return d
 
